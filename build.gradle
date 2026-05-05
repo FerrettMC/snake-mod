@@ -80,7 +80,9 @@ minecraft {
         }
 
         client {
-            // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
+            workingDirectory project.file('run')
+            args '--username', 'imFerrett'
+            args '--uuid', '72a76645-4ec3-4b22-b260-55cc338a9a4f'
             property 'forge.enabledGameTestNamespaces', mod_id
         }
 
