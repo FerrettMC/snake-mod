@@ -2,6 +2,7 @@ package com.mod.snakemod;
 
 import it.unimi.dsi.fastutil.ints.IntList;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -16,7 +17,9 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.FireworkExplosion;
 import net.minecraft.world.item.component.Fireworks;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 import java.util.*;
@@ -38,6 +41,7 @@ public class Game {
     public static int speed = 6;
     private static int score = 0;
     private static final Random random = new Random();
+
 
     public static class Body {
         public int x, y, z;
@@ -72,7 +76,7 @@ public class Game {
             } while (isPosInSnake(applePos, true));
 
             serverLevel.setBlock(applePos, Blocks.RED_CONCRETE.defaultBlockState(), 3);
-            serverLevel.setBlock(new BlockPos(applePos.getX(), applePos.getY() + 1, applePos.getZ()), Blocks.MANGROVE_PROPAGULE.defaultBlockState(), 3);
+            serverLevel.setBlock(new BlockPos(applePos.getX(), applePos.getY() + 1, applePos.getZ()), Blocks.MANGROVE_PROPAGULE.defaultBlockState(), 2);
             apples.add(applePos);
         }
     }
@@ -116,94 +120,147 @@ public class Game {
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         if (serverPlayer == null || snake.isEmpty() || !started || direction == null || !playerStartedGame) return;
+
         if (serverPlayer.level() instanceof ServerLevel serverLevel) {
             serverLevel.setBlock(startBlock, Blocks.GLASS.defaultBlockState(), 3);
-        }
 
-        tickCounter++;
-        if (tickCounter % speed == 0) {
-            if (serverPlayer.level() instanceof ServerLevel serverLevel) {
-                serverPlayer.displayClientMessage(Component.literal("Score: §c" + score), true);
+            tickCounter++;
+            if (tickCounter % speed != 0) return;
 
-                // 1. Compute new head position
-                Body head = snake.getFirst();
-                int addX;
-                int addZ;
-                switch (direction) {
-                    case "down" -> { addX = 1; addZ = 0; }
-                    case "up" -> { addX = -1; addZ = 0; }
-                    case "right" -> { addX = 0; addZ = -1; }
-                    case "left" -> { addX = 0; addZ = 1; }
-                    default -> { return; } // don't move if direction is unrecognized
-                }
-                Body newHead = new Body(head.x + addX, head.y, head.z + addZ, "head");
+            serverPlayer.displayClientMessage(Component.literal("Score: §c" + score), true);
 
-                // 2. Place new head block
-                BlockPos newHeadPos = new BlockPos(newHead.x, newHead.y, newHead.z);
+            // 1. Compute new head position
+            Body head = snake.getFirst();
+            int addX = 0, addZ = 0;
+            switch (direction) {
+                case "down"  -> addX =  1;
+                case "up"    -> addX = -1;
+                case "right" -> addZ = -1;
+                case "left"  -> addZ =  1;
+                default -> { return; }
+            }
+
+            Body newHead = new Body(head.x + addX, head.y, head.z + addZ, "head");
+            BlockPos newHeadPos = new BlockPos(newHead.x, newHead.y, newHead.z);
+
+            // 2. Check apple BEFORE mutating snake or checking collisions
+            boolean ateApple = apples.contains(newHeadPos);
+
+            // 3. Add new head, demote old head to body
+            snake.addFirst(newHead);
+            Body oldHead = snake.get(1);
+            snake.set(1, new Body(oldHead.x, oldHead.y, oldHead.z, "body"));
+            serverLevel.setBlock(new BlockPos(oldHead.x, oldHead.y + 1, oldHead.z), Blocks.AIR.defaultBlockState(), 3);
+
+            // 4. Remove tail (but keep it around in case we ate an apple)
+            Body tail = snake.removeLast();
+            BlockPos tailPos = new BlockPos(tail.x, tail.y, tail.z);
+
+            if (ateApple) {
+                // Grow the snake by putting the tail back
+                snake.addLast(tail);
+            } else {
+                serverLevel.setBlock(tailPos, Blocks.AIR.defaultBlockState(), 3);
+            }
+
+            // 5. Place new head block
+            serverLevel.setBlock(newHeadPos, Blocks.RED_WOOL.defaultBlockState(), 3);
+
+            // Place eyes
+            Direction facing = Direction.NORTH;
+
+            // 270 degrees
+            facing = switch (direction) {
+                case "right" -> Direction.NORTH; // 180 degrees
+
+                case "left" -> Direction.SOUTH; // 0 degrees
+
+                case "up" -> Direction.WEST; // 90 degrees
+
+                case "down" -> Direction.EAST;
+                default -> facing;
+            };
+
+            serverLevel.setBlock(
+                    new BlockPos(newHeadPos.getX(), newHeadPos.getY() + 1, newHeadPos.getZ()),
+                    ModBlocks.EYES.get().defaultBlockState().setValue(EyesPressurePlateBlock.FACING, facing),
+                    3
+            );
+
+
+
+            // 6. Recolor body blocks
+            int i = 0;
+            for (Body segment : snake) {
+                i++;
+                if (segment.type.equals("head")) continue;
+                BlockPos blockPos = new BlockPos(segment.x, segment.y, segment.z);
+                serverLevel.setBlock(blockPos, i % 2 == 0
+                        ? Blocks.LIGHT_BLUE_WOOL.defaultBlockState()
+                        : Blocks.CYAN_WOOL.defaultBlockState(), 3);
+            }
+
+            // 7. Self-collision check (safe to do now, apple position is not a body segment)
+            if (!ateApple && isPosInSnake(newHeadPos, false)) {
+                endGame(serverLevel, false);
+                return;
+            }
+
+            // 8. Out-of-bounds check
+            if (outOfBounds.contains(newHeadPos)) {
+                endGame(serverLevel, false);
+                return;
+            }
+
+            // 9. Handle apple effects
+            if (ateApple) {
+                score++;
+                apples.remove(newHeadPos);
+                if (score % 5 == 0 && maxApples < 5) maxApples++;
+
+                // Remove the apple blocks
+
                 serverLevel.setBlock(newHeadPos, Blocks.RED_WOOL.defaultBlockState(), 3);
 
-                // 3. Add new head to front
-                snake.addFirst(newHead);
 
-                Body oldHead = snake.get(1);
-                snake.set(1, new Body(oldHead.x, oldHead.y, oldHead.z, "body"));
-
-                // 4. Remove tail block
-                Body tail = snake.removeLast();
-                BlockPos tailPos = new BlockPos(tail.x, tail.y, tail.z);
-                serverLevel.setBlock(tailPos, Blocks.AIR.defaultBlockState(), 3);
-                int i = 0;
-                for (Body snake_block : snake) {
-                    i++;
-                    if (snake_block.type.equals("head"))
-                        continue;
-                    BlockPos blockPos = new BlockPos(snake_block.x, snake_block.y, snake_block.z);
-                    if (i % 2 == 0) {
-                        serverLevel.setBlock(blockPos, Blocks.LIGHT_BLUE_WOOL.defaultBlockState(), 3);
-                    } else {
-                        serverLevel.setBlock(blockPos, Blocks.CYAN_WOOL.defaultBlockState(), 3);
-                    }
-                }
-                if (isPosInSnake(new BlockPos(newHead.x, newHead.y, newHead.z), false)) {
-                    started = false;
-                    serverPlayer.removeAllEffects();
-                    serverPlayer.connection.send(new ClientboundSetTitleTextPacket(Component.literal("Game over! Score: §6" + score)));
-                    fireworks(serverLevel, fireworkPos.getX(), fireworkPos.getY(), fireworkPos.getZ());
-                    playerStartedGame = false;
+                if (snake.size() >= Start.platformLength * Start.platformLength) {
+                    endGame(serverLevel, true);
                     return;
-                }
-                if (outOfBounds.contains(new BlockPos(newHead.x, newHead.y, newHead.z))) {
-                    started = false;
-                    serverPlayer.removeAllEffects();
-                    serverPlayer.connection.send(new ClientboundSetTitleTextPacket(Component.literal("Game over! Score: §6" + score)));
-                    playerStartedGame = false;
-                    fireworks(serverLevel, fireworkPos.getX(), fireworkPos.getY(), fireworkPos.getZ());
-                    return;
-                }
-                if (apples.contains(new BlockPos(newHead.x, newHead.y, newHead.z))) {
-                    score++;
-                    if (score % 5 == 0 && maxApples < 5) {
-                        maxApples++;
-                    }
-                    snake.add(tail);
-                    apples.remove(new BlockPos(newHead.x, newHead.y, newHead.z));
-
-                }
-                if (apples.size() < maxApples) {
-                    BlockPos applePos;
-                    do {
-
-                        // pick a random pos from possibleApples
-                        applePos = possibleApples.get(random.nextInt(possibleApples.size()));
-                    } while (isPosInSnake(applePos, true));
-
-                    serverLevel.setBlock(applePos, Blocks.RED_CONCRETE.defaultBlockState(), 3);
-                    serverLevel.setBlock(new BlockPos(applePos.getX(), applePos.getY() + 1, applePos.getZ()), Blocks.MANGROVE_PROPAGULE.defaultBlockState(), 3);
-                    apples.add(applePos);
                 }
             }
-        }
 
+            // 10. Spawn new apples if needed
+            int attempt = 0;
+            while (apples.size() < maxApples) {
+                BlockPos applePos;
+                do {
+                    applePos = possibleApples.get(random.nextInt(possibleApples.size()));
+                    attempt++;
+                } while (isPosInSnake(applePos, true) && attempt < 30);
+                if (attempt >= 30) break;
+
+                serverLevel.setBlock(applePos, Blocks.RED_CONCRETE.defaultBlockState(), 3);
+                serverLevel.setBlock(new BlockPos(applePos.getX(), applePos.getY() + 1, applePos.getZ()), Blocks.MANGROVE_PROPAGULE.defaultBlockState(), 2);
+                apples.add(applePos);
+
+            }
+            for (BlockPos apple : apples) {
+                serverLevel.setBlock(new BlockPos(apple.getX(), apple.getY() + 1, apple.getZ()), Blocks.MANGROVE_PROPAGULE.defaultBlockState(), 2);
+            }
+
+        }
+    }
+
+    private static void endGame(ServerLevel serverLevel, boolean won) {
+        started = false;
+        playerStartedGame = false;
+        serverPlayer.removeAllEffects();
+        String message = won
+                ? "You win! Score: §6" + score
+                : "Game over! Score: §6" + score;
+        serverPlayer.connection.send(new ClientboundSetTitleTextPacket(Component.literal(message)));
+        serverPlayer.sendSystemMessage(Component.literal("Game over. §2" + score + "§f out of §5" + (Start.platformLength * Start.platformLength - 2) + "§f possible."));
+        fireworks(serverLevel, fireworkPos.getX(), fireworkPos.getY(), fireworkPos.getZ());
     }
 
 
@@ -219,6 +276,8 @@ public class Game {
 
         if (lastPos == null || currentPos.equals(lastPos) || !started) return;
         if (lastPos == startPos) return;
+
+
 
         lastPos = currentPos;
         if (player.blockPosition().getX() == startPos.getX()) {
@@ -274,4 +333,12 @@ public class Game {
 
 
     }
+    @SubscribeEvent
+    public void onNeighborNotify(BlockEvent.NeighborNotifyEvent event) {
+        // Only cancel neighbor updates for propagules
+        if (event.getState().is(Blocks.MANGROVE_PROPAGULE)) {
+            event.setCanceled(true);
+        }
+    }
+
 }

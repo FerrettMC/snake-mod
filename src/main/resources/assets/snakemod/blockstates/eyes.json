@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "powered=false,facing=north": { "model": "snakemod:block/eyes" },
+    "powered=false,facing=south": { "model": "snakemod:block/eyes", "y": 180 },
+    "powered=false,facing=west":  { "model": "snakemod:block/eyes", "y": 270 },
+    "powered=false,facing=east":  { "model": "snakemod:block/eyes", "y": 90 },
+
+    "powered=true,facing=north": { "model": "snakemod:block/eyes_down" },
+    "powered=true,facing=south": { "model": "snakemod:block/eyes_down", "y": 180 },
+    "powered=true,facing=west":  { "model": "snakemod:block/eyes_down", "y": 270 },
+    "powered=true,facing=east":  { "model": "snakemod:block/eyes_down", "y": 90 }
+  }
+}

@@ -29,7 +29,19 @@ public class Start {
         }
 
         if (message.equalsIgnoreCase("help")) {
-            player.sendSystemMessage(Component.literal("Welcome to snake mod! Type snake (length) (speed) (optional)). For example, snake 10. After a game of snake, type clear to clear the board."));
+            player.sendSystemMessage(Component.literal("""
+                §a§lSnake Commands:
+                §e• §f§lsnake <size> §7– Start a game (size 4–1000)
+                §e• §f§lsnake <size> <speed> §7– Start with custom speed (1–6)
+                §e• §f§lstop §7– Quit your current game
+                §e• §f§lclear §7– Remove the board after a game ends
+                §e• §f§lhelp §7– Show this help menu
+                
+                §aHow to Play:
+                §7Move on the control platform to steer your snake.
+                §7Eat red concrete apples to grow and score points.
+                §cDon't hit the walls or yourself!
+                """));
             event.setCanceled(true);
             return;
         }
@@ -63,7 +75,7 @@ public class Start {
                 event.setCanceled(true);
                 return;
             }
-            if (length < 3 || length > 100) {
+            if (length < 4 || length > 100) {
                 player.sendSystemMessage(Component.literal("Not a valid length."));
                 event.setCanceled(true);
                 return;
@@ -79,10 +91,10 @@ public class Start {
                     }
                     switch (speed) {
                         case 6 -> Game.speed = 1;
-                        case 5 -> Game.speed = 4;
+                        case 5 -> Game.speed = 3;
                         case 4 -> Game.speed = 5;
                         case 2 -> Game.speed = 8;
-                        case 1 -> Game.speed = 10;
+                        case 1 -> Game.speed = 10; // 10
                         default -> Game.speed = 6;
                     }
 
@@ -153,12 +165,20 @@ public class Start {
             Game.snake.add(body);
             serverLevel.setBlock(new BlockPos(body.x, body.y, body.z), Blocks.LIGHT_BLUE_WOOL.defaultBlockState(), 3);
             serverLevel.setBlock(pos, Blocks.RED_WOOL.defaultBlockState(), 3);
+            serverLevel.setBlock(
+                    new BlockPos(pos.getX(), pos.getY() + 1, pos.getZ()),
+                    ModBlocks.EYES.get().defaultBlockState(),
+                    3
+            );
+
             player.getAbilities().flying = false;
             player.onUpdateAbilities(); // syncs to client
             player.connection.teleport(player.getX(), player.getY(), player.getZ(), 90f, 0f);
             player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SPEED, 99999, 3, false, false));
             Game.fireworkPos = pos;
-            Game.speed = 6;
+            if (words.length == 2) {
+                Game.speed = 6;
+            }
 
 
 
