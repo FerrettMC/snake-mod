@@ -1,49 +1,65 @@
-# You can really ignore all of this, just clone the repo in IntelliJ Idea and follow instructions in the TODO file.
+# Snake Mod
 
+A Minecraft Forge mod that brings the classic Snake game to life inside your world using blocks and player movement.
 
+---
 
-Source installation information for modders
--------------------------------------------
-This code follows the Minecraft Forge installation methodology. It will apply
-some small patches to the vanilla MCP source code, giving you and it access 
-to some of the data and functions you need to build a successful mod.
+## How It Works
 
-Note also that the patches are built against "un-renamed" MCP source code (aka
-SRG Names) - this means that you will not be able to read them directly against
-normal code.
+Type `snake 10` in chat and a full Snake board is instantly built around you — checkered green floor, glass walls, and a small control platform you're teleported to. Step in any direction on the platform to start moving your snake. Eat the apples to grow. Don't hit the walls or yourself.
 
-Setup Process:
-==============================
+---
 
-Step 1: Open your command-line and browse to the folder where you extracted the zip file.
+## Commands
 
-Step 2: You're left with a choice.
-If you prefer to use Eclipse:
-1. Run the following command: `./gradlew genEclipseRuns`
-2. Open Eclipse, Import > Existing Gradle Project > Select Folder 
-   or run `gradlew eclipse` to generate the project.
+| Command | Description |
+|---|---|
+| `snake <size>` | Start a game (size 4–100) |
+| `snake <size> <speed>` | Start with custom speed (1–6) |
+| `stop` | Quit your current game |
+| `clear` | Remove the board after a game |
+| `help` | Show command info |
 
-If you prefer to use IntelliJ:
-1. Open IDEA, and import project.
-2. Select your build.gradle file and have it import.
-3. Run the following command: `./gradlew genIntellijRuns`
-4. Refresh the Gradle Project in IDEA if required.
+---
 
-If at any point you are missing libraries in your IDE, or you've run into problems you can 
-run `gradlew --refresh-dependencies` to refresh the local cache. `gradlew clean` to reset everything 
-(this does not affect your code) and then start the process again.
+## Features
 
-Mapping Names:
-=============================
-By default, the MDK is configured to use the official mapping names from Mojang for methods and fields 
-in the Minecraft codebase. These names are covered by a specific license. All modders should be aware of this
-license, if you do not agree with it you can change your mapping names to other crowdsourced names in your 
-build.gradle. For the latest license text, refer to the mapping file itself, or the reference copy here:
-https://github.com/MinecraftForge/MCPConfig/blob/master/Mojang.md
+- Fully in-world Snake built from Minecraft blocks
+- Checkerboard green concrete floor with glass walls
+- Alternating cyan and light blue wool body
+- Apples spawn randomly — more appear every 5 points, up to 5 at once
+- Score displayed above the hotbar throughout gameplay
+- Game over title screen with final score and a firework
+- Speed boost effect while playing for responsive controls
+- Fully customizable board size and speed per game
+- Multiplayer support — every player runs a completely independent game simultaneously
 
-Additional Resources: 
-=========================
-Community Documentation: https://docs.minecraftforge.net/en/latest/gettingstarted/
-LexManos' Install Video: https://youtu.be/8VEdtQLuLO0
-Forge Forums: https://forums.minecraftforge.net/
-Forge Discord: https://discord.minecraftforge.net/
+---
+
+## Building
+
+**Requirements**
+- Java 21
+- Forge MDK for Minecraft 1.21
+
+```bash
+git clone https://github.com/yourname/snakemod
+cd snakemod
+./gradlew build
+```
+
+The built jar will be at `build/libs/snakemod-<version>.jar`.
+
+---
+
+## Installation
+
+1. Install [Forge for Minecraft 1.21](https://files.minecraftforge.net)
+2. Drop the jar into your `mods/` folder
+3. Launch Minecraft with the Forge profile
+
+---
+
+## About
+
+Built as part of a modding content series — the first in a series of videos where increasingly cursed and creative Minecraft mods get coded from scratch. More coming soon.
